@@ -1,4 +1,4 @@
-platform :ios, '12.0'
+platform :ios, '13.0'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -39,7 +39,7 @@ post_install do |installer|
     
     # Add these lines for Firebase compatibility
     target.build_configurations.each do |config|
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '12.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
       
       # Add these lines for Firebase Phone Auth
       config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= [
