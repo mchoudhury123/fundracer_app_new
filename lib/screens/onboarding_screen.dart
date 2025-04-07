@@ -110,92 +110,104 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     final padding = MediaQuery.of(context).padding;
     
     return Scaffold(
+      backgroundColor: AppColors.lightBlue, // Set scaffold background to match container
       body: SafeArea(
+        bottom: false, // Don't apply safe area to bottom
         child: SingleChildScrollView(
           child: SizedBox(
-            height: size.height - padding.top - padding.bottom,
+            height: size.height - padding.top, // Remove bottom padding from height calculation
             child: Column(
               children: [
                 SizedBox(height: padding.top > 20 ? 20 : 0),
                 Expanded(
                   flex: 3,
-                  child: PageView.builder(
-                    controller: _pageController,
-                    physics: const BouncingScrollPhysics(),
-                    onPageChanged: (int page) {
-                      setState(() {
-                        _currentPage = page;
-                      });
-                      // Reset timer when page is manually changed
-                      _startTimer();
-                    },
-                    itemCount: _slides.length,
-                    itemBuilder: (context, index) {
-                      return GestureDetector(
-                        onTapDown: (_) {
-                          _timer?.cancel();  // Pause timer when user taps
-                        },
-                        onTapUp: (_) {
-                          _startTimer();  // Resume timer when user releases
-                        },
-                        child: Container(
-                          width: size.width,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                _slides[index]['title']!,
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  height: 1.2,
-                                  color: AppColors.deepBlue,
+                  child: Container(
+                    color: AppColors.white, // Add white background to top section
+                    child: PageView.builder(
+                      controller: _pageController,
+                      physics: const BouncingScrollPhysics(),
+                      onPageChanged: (int page) {
+                        setState(() {
+                          _currentPage = page;
+                        });
+                        // Reset timer when page is manually changed
+                        _startTimer();
+                      },
+                      itemCount: _slides.length,
+                      itemBuilder: (context, index) {
+                        return GestureDetector(
+                          onTapDown: (_) {
+                            _timer?.cancel();  // Pause timer when user taps
+                          },
+                          onTapUp: (_) {
+                            _startTimer();  // Resume timer when user releases
+                          },
+                          child: Container(
+                            width: size.width,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  _slides[index]['title']!,
+                                  style: TextStyle(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.bold,
+                                    height: 1.2,
+                                    color: AppColors.deepBlue,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              SizedBox(
-                                height: size.height * 0.22,
-                                child: Image.asset(
-                                  _slides[index]['image']!,
-                                  fit: BoxFit.contain,
+                                const SizedBox(height: 16),
+                                SizedBox(
+                                  height: size.height * 0.22,
+                                  child: Image.asset(
+                                    _slides[index]['image']!,
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                _slides[index]['subtitle']!,
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.textGrey,
+                                Text(
+                                  _slides[index]['subtitle']!,
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.textGrey,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                // Page indicator dots
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    _slides.length,
-                    (index) => Container(
-                      width: 8,
-                      height: 8,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _currentPage == index
-                            ? AppColors.primaryBlue
-                            : AppColors.primaryBlue.withOpacity(0.3),
-                      ),
+                        );
+                      },
                     ),
                   ),
                 ),
-                const SizedBox(height: 20),
+                Container(
+                  color: AppColors.white,
+                  child: Column(
+                    children: [
+                      // Page indicator dots
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          _slides.length,
+                          (index) => Container(
+                            width: 8,
+                            height: 8,
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _currentPage == index
+                                  ? AppColors.primaryBlue
+                                  : AppColors.primaryBlue.withOpacity(0.3),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ],
+                  ),
+                ),
                 Container(
                   width: size.width,
                   decoration: BoxDecoration(
@@ -206,7 +218,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     ),
                   ),
                   child: Padding(
-                    padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 16),
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -298,37 +310,40 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           ),
                         ),
                         const SizedBox(height: 20),
-                        RichText(
-                          textAlign: TextAlign.center,
-                          text: TextSpan(
-                            text: 'By continuing, you agree to our ',
-                            style: TextStyle(
-                              color: AppColors.textGrey,
-                              fontSize: 12,
+                        Padding(
+                          padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom),
+                          child: RichText(
+                            textAlign: TextAlign.center,
+                            text: TextSpan(
+                              text: 'By continuing, you agree to our ',
+                              style: TextStyle(
+                                color: AppColors.textGrey,
+                                fontSize: 12,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: 'Terms of Service',
+                                  style: TextStyle(
+                                    color: AppColors.primaryBlue,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  recognizer: TapGestureRecognizer()
+                                    ..onTap = _handleTermsClick,
+                                ),
+                                const TextSpan(
+                                  text: ' and ',
+                                ),
+                                TextSpan(
+                                  text: 'Privacy Policy',
+                                  style: TextStyle(
+                                    color: AppColors.primaryBlue,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  recognizer: TapGestureRecognizer()
+                                    ..onTap = _handlePrivacyClick,
+                                ),
+                              ],
                             ),
-                            children: [
-                              TextSpan(
-                                text: 'Terms of Service',
-                                style: TextStyle(
-                                  color: AppColors.primaryBlue,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                recognizer: TapGestureRecognizer()
-                                  ..onTap = _handleTermsClick,
-                              ),
-                              const TextSpan(
-                                text: ' and ',
-                              ),
-                              TextSpan(
-                                text: 'Privacy Policy',
-                                style: TextStyle(
-                                  color: AppColors.primaryBlue,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                recognizer: TapGestureRecognizer()
-                                  ..onTap = _handlePrivacyClick,
-                              ),
-                            ],
                           ),
                         ),
                       ],

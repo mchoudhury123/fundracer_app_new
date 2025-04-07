@@ -11,9 +11,19 @@ import 'profile_screen.dart';
 import 'run_tracking_screen.dart';
 import 'charities_screen.dart';
 import 'dart:math' as math;
+import 'dart:convert' show json;
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final Function(double totalDonations, double totalDistance)? onStatsUpdated;
+  final List<Map<String, dynamic>> donatedActivities;
+  final Map<String, int> activityRates;
+
+  const HomeScreen({
+    super.key,
+    this.onStatsUpdated,
+    this.donatedActivities = const [],
+    this.activityRates = const {},
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -32,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
   double _totalDonated = 405.0; // Starting with $405 as shown in the screenshot
   double _conversionRate = 10.0; // $10 per km
   String _selectedCharityName = 'Feeding America';
+  Map<String, int> _activityRates = {};
 
   final List<Map<String, dynamic>> _stories = [
     {
@@ -64,6 +75,17 @@ class _HomeScreenState extends State<HomeScreen> {
     _initializeServices();
     _loadSelectedCharity();
     _loadRunHistory();
+    RunTrackingScreen.onActivitiesUpdated = () {
+      if (mounted) {
+        setState(() {});
+      }
+    };
+  }
+
+  @override
+  void dispose() {
+    RunTrackingScreen.onActivitiesUpdated = null;
+    super.dispose();
   }
 
   Future<void> _initializeServices() async {
@@ -76,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
     
     await _requestPermissionsAndFetchData();
     await _checkStravaConnection();
+    await _loadDonatedActivitiesStats();
   }
 
   Future<void> _checkStravaConnection() async {
@@ -203,10 +226,30 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  Future<void> _loadDonatedActivitiesStats() async {
+    final prefs = await SharedPreferences.getInstance();
+    final donatedIds = prefs.getStringList('donated_activity_ids') ?? [];
+    
+    // If there are donated activities, we shouldn't use the random sample data
+    if (donatedIds.isNotEmpty) {
+      setState(() {
+        // Reset the random data
+        _runHistory.clear();
+        // Keep the donated distance and amount at 0 until we get stats from the RunTrackingScreen
+        _totalDonated = 0;
+        _totalDistance = 0;
+      });
+    }
+  }
+
   Future<void> _loadRunHistory() async {
     // In a real app, this would fetch from Strava API or local storage
     // For demo purposes, we'll generate some sample data
-    if (_runHistory.isEmpty) {
+    final prefs = await SharedPreferences.getInstance();
+    final donatedIds = prefs.getStringList('donated_activity_ids') ?? [];
+    
+    // Only load sample data if there are no real donated activities
+    if (_runHistory.isEmpty && donatedIds.isEmpty) {
       final now = DateTime.now();
       final random = math.Random();
       
@@ -366,29 +409,31 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Hello, ${FirebaseAuth.instance.currentUser?.displayName?.split(' ').first ?? 'Runner'}!',
-                    style: TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.deepBlue,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hello, ${FirebaseAuth.instance.currentUser?.displayName?.split(' ').first ?? 'Runner'}!',
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.deepBlue,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Let\'s make an impact today',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.textGrey,
+                    const SizedBox(height: 4),
+                    Text(
+                      'Let\'s make an impact today',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.textGrey,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
+              const SizedBox(width: 8),
               GestureDetector(
                 onTap: () {
                   setState(() {
@@ -396,8 +441,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   });
                 },
                 child: Container(
-                  padding: const EdgeInsets.all(8),
-                  constraints: const BoxConstraints(maxWidth: 150), // Limit the width
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
                     color: AppColors.white,
                     borderRadius: BorderRadius.circular(15),
@@ -410,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min, // Make row wrap its content
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
                         Icons.favorite,
@@ -418,7 +462,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         size: 18,
                       ),
                       const SizedBox(width: 6),
-                      Flexible(
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.3, // 30% of screen width
+                        ),
                         child: Text(
                           _selectedCharityName,
                           style: TextStyle(
@@ -712,38 +759,15 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 20),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.info_outline,
-                  color: Colors.white,
-                  size: 18,
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'Every 1 km = \$10 donation',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
   }
 
   Widget _buildRecentActivitySection() {
+    final activities = RunTrackingScreen.donatedActivities;
+    final activityRates = RunTrackingScreen.activityRates;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -762,9 +786,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               TextButton(
                 onPressed: () {
-                  // Navigate to runs history page
                   setState(() {
-                    _selectedIndex = 1;
+                    _selectedIndex = 1; // Switch to RunTrackingScreen
                   });
                 },
                 child: Text(
@@ -778,139 +801,142 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        _runHistory.isEmpty
-            ? Center(
+        if (activities.isEmpty)
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.directions_run,
+                    size: 48,
+                    color: AppColors.lightBlue,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No donated runs yet',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.deepBlue,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Start your first run to make an impact',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textGrey,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _selectedIndex = 1; // Switch to RunTrackingScreen
+                      });
+                    },
+                    icon: const Icon(Icons.directions_run),
+                    label: const Text('Start Running'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )
+        else
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: activities.length > 3 ? 3 : activities.length, // Show only 3 most recent runs
+            itemBuilder: (context, index) {
+              final activity = activities[index];
+              final bool isMetric = activity['is_metric'] ?? true;
+              final conversionFactor = isMetric ? 1000.0 : 1609.34;
+              final distance = (activity['distance'] as num).toDouble() / conversionFactor;
+              final duration = activity['moving_time'] as int;
+              final date = DateTime.parse(activity['start_date'] as String);
+              final activityId = activity['id'].toString();
+              final rate = activityRates[activityId] ?? 10;
+              final donation = distance * rate;
+              final String unitName = isMetric ? 'km' : 'mi';
+
+              return Card(
+                margin: const EdgeInsets.only(bottom: 12),
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
                 child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
                     children: [
-                      Icon(
-                        Icons.directions_run,
-                        size: 48,
-                        color: AppColors.lightBlue,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No runs yet',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.deepBlue,
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppColors.lightBlue,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.directions_run,
+                          color: AppColors.primaryBlue,
+                          size: 24,
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Start your first run to make an impact',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textGrey,
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const RunTrackingScreen(),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              activity['name'] as String,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textBlack,
+                              ),
                             ),
-                          );
-                        },
-                        icon: const Icon(Icons.directions_run),
-                        label: const Text('Start Running'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${date.day}/${date.month}/${date.year} • ${distance.toStringAsFixed(1)} $unitName',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textGrey,
+                              ),
+                            ),
+                          ],
                         ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '\$${donation.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryBlue,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '\$$rate/$unitName',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textGrey,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-              )
-            : ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _runHistory.length > 3 ? 3 : _runHistory.length, // Show only 3 most recent runs
-                itemBuilder: (context, index) {
-                  final run = _runHistory[index];
-                  final date = run['date'] as DateTime;
-                  final distance = run['distance'] as double;
-                  final duration = run['duration'] as Duration;
-                  final donation = run['donation'] as double;
-                  
-                  return Card(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    elevation: 2,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: AppColors.lightBlue,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.directions_run,
-                              color: AppColors.primaryBlue,
-                              size: 24,
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '${date.day}/${date.month}/${date.year}',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.textBlack,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${distance.toStringAsFixed(1)} km • ${duration.inMinutes} min',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: AppColors.textGrey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                '\$${donation.toStringAsFixed(2)}',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primaryBlue,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Donated',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.textGrey,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
+              );
+            },
+          ),
       ],
     );
   }
